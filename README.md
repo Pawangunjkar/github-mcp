@@ -15,7 +15,7 @@ Author: **Pawan Gunjkar** (pawangunjkar@gmail.com)
 No clone required — install and run directly:
 
 ```bash
-uvx github-mcp
+uvx pawangunjkar-github-mcp
 ```
 
 **Cursor / Claude Desktop** — add to `.cursor/mcp.json` or `claude_desktop_config.json`:
@@ -25,7 +25,7 @@ uvx github-mcp
   "mcpServers": {
     "github": {
       "command": "uvx",
-      "args": ["github-mcp"],
+      "args": ["pawangunjkar-github-mcp"],
       "env": {
         "GITHUB_TOKEN": "ghp_your-token-here",
         "GITHUB_PROTOCOL": "ssh"
@@ -296,7 +296,7 @@ Add to `.cursor/mcp.json`:
   "mcpServers": {
     "github": {
       "command": "uvx",
-      "args": ["github-mcp"],
+      "args": ["pawangunjkar-github-mcp"],
       "env": {
         "GITHUB_TOKEN": "ghp_your-token-here",
         "GITHUB_PROTOCOL": "ssh"
@@ -332,7 +332,7 @@ Add to `claude_desktop_config.json`:
   "mcpServers": {
     "github": {
       "command": "uvx",
-      "args": ["github-mcp"],
+      "args": ["pawangunjkar-github-mcp"],
       "env": {
         "GITHUB_TOKEN": "ghp_your-token-here",
         "GITHUB_PROTOCOL": "ssh"

@@ -23,7 +23,7 @@ startCommand:
   commandFunction: |-
     (config) => ({
       command: 'uvx',
-      args: ['github-mcp'],
+      args: ['pawangunjkar-github-mcp'],
       env: {
         GITHUB_TOKEN: config.GITHUB_TOKEN,
         GITHUB_API_URL: config.GITHUB_API_URL || 'https://api.github.com',

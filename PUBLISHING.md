@@ -31,7 +31,7 @@ twine upload dist/*
   "mcpServers": {
     "github": {
       "command": "uvx",
-      "args": ["github-mcp"],
+      "args": ["pawangunjkar-github-mcp"],
       "env": {
         "GITHUB_TOKEN": "ghp_your-token-here",
         "GITHUB_PROTOCOL": "ssh"
