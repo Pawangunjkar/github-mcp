@@ -2911,5 +2911,10 @@ def github_mark_notifications_read(
 # Entry Point
 # ============================================================
 
-if __name__ == "__main__":
+def main() -> None:
+    """Console entry point for PyPI / uvx installs."""
     mcp.run(transport="stdio")
+
+
+if __name__ == "__main__":
+    main()

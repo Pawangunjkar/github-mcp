@@ -4,15 +4,36 @@ version = "1.0.0"
 description = "MCP server for GitHub operations — 73 tools for repos, PRs, issues, actions, releases, search, and more"
 requires-python = ">=3.10"
 authors = [
-    { name = "Pawan Gunjkar", email = "pawangunjkar@gamil.com" }
+    { name = "Pawan Gunjkar", email = "pawangunjkar@gmail.com" }
 ]
 readme = "README.md"
 license = { text = "MIT" }
+keywords = ["mcp", "model-context-protocol", "github", "git", "pull-requests", "ci-cd", "devops"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Version Control :: Git",
+]
 
 dependencies = [
     "mcp[cli]>=1.0.0",
     "httpx>=0.27.0",
 ]
+
+[project.scripts]
+github-mcp = "server:main"
+
+[project.urls]
+Homepage = "https://github.com/Pawangunjkar/github-mcp"
+Repository = "https://github.com/Pawangunjkar/github-mcp"
+Issues = "https://github.com/Pawangunjkar/github-mcp/issues"
+Documentation = "https://github.com/Pawangunjkar/github-mcp#readme"
 
 [build-system]
 requires = ["hatchling"]
@@ -20,3 +41,12 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "server.py",
+    "github_client.py",
+    "credential_store.py",
+    "README.md",
+    "LICENSE",
+]

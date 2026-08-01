@@ -4,7 +4,55 @@
 
 A comprehensive [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that exposes the full GitHub REST API as AI-ready tools. Connect your AI assistant (Cursor, Claude Desktop, or any MCP client) to manage GitHub through natural language.
 
-Author: **Pawan Gunjkar** (pawangunjkar@gamil.com)
+Author: **Pawan Gunjkar** (pawangunjkar@gmail.com)
+
+---
+
+## 📥 Install
+
+### Option 1: PyPI / uvx (Recommended)
+
+No clone required — install and run directly:
+
+```bash
+uvx github-mcp
+```
+
+**Cursor / Claude Desktop** — add to `.cursor/mcp.json` or `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "uvx",
+      "args": ["github-mcp"],
+      "env": {
+        "GITHUB_TOKEN": "ghp_your-token-here",
+        "GITHUB_PROTOCOL": "ssh"
+      }
+    }
+  }
+}
+```
+
+### Option 2: Smithery
+
+```bash
+npx -y @smithery/cli install github-mcp --client cursor
+```
+
+Or browse [smithery.ai](https://smithery.ai) and search for **github-mcp**.
+
+### Option 3: Clone from GitHub
+
+```bash
+git clone https://github.com/Pawangunjkar/github-mcp.git
+cd github-mcp
+uv sync
+uv run server.py
+```
+
+> See [PUBLISHING.md](PUBLISHING.md) for PyPI, Smithery, and directory submission steps.
 
 ---
 
@@ -247,6 +295,23 @@ Add to `.cursor/mcp.json`:
 {
   "mcpServers": {
     "github": {
+      "command": "uvx",
+      "args": ["github-mcp"],
+      "env": {
+        "GITHUB_TOKEN": "ghp_your-token-here",
+        "GITHUB_PROTOCOL": "ssh"
+      }
+    }
+  }
+}
+```
+
+**Alternative (from source):**
+
+```json
+{
+  "mcpServers": {
+    "github": {
       "command": "uv",
       "args": ["run", "--directory", "/path/to/github-mcp", "server.py"],
       "env": {
@@ -266,8 +331,8 @@ Add to `claude_desktop_config.json`:
 {
   "mcpServers": {
     "github": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/github-mcp", "server.py"],
+      "command": "uvx",
+      "args": ["github-mcp"],
       "env": {
         "GITHUB_TOKEN": "ghp_your-token-here",
         "GITHUB_PROTOCOL": "ssh"

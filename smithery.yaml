@@ -1,0 +1,36 @@
+# Smithery.ai configuration — https://smithery.ai/docs/build/publish
+# Submit this repo at https://smithery.ai after publishing to PyPI
+
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      GITHUB_TOKEN:
+        type: string
+        description: GitHub Personal Access Token (classic or fine-grained)
+      GITHUB_API_URL:
+        type: string
+        description: GitHub API URL (default https://api.github.com, change for GitHub Enterprise)
+      GITHUB_PROTOCOL:
+        type: string
+        description: Preferred clone protocol — ssh or https (default ssh)
+      GITHUB_TIMEOUT:
+        type: string
+        description: Request timeout in seconds (default 30)
+    required:
+      - GITHUB_TOKEN
+  commandFunction: |-
+    (config) => ({
+      command: 'uvx',
+      args: ['github-mcp'],
+      env: {
+        GITHUB_TOKEN: config.GITHUB_TOKEN,
+        GITHUB_API_URL: config.GITHUB_API_URL || 'https://api.github.com',
+        GITHUB_PROTOCOL: config.GITHUB_PROTOCOL || 'ssh',
+        ...(config.GITHUB_TIMEOUT ? { GITHUB_TIMEOUT: config.GITHUB_TIMEOUT } : {})
+      }
+    })
+  exampleConfig:
+    GITHUB_TOKEN: "ghp_your-token-here"
+    GITHUB_PROTOCOL: "ssh"
