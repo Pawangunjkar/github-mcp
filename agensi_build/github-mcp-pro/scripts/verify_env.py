@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pre-flight check for pawangunjkar-github-mcp. Standard library only."""
+"""Pre-flight check for github-mcp. Standard library only."""
 
 import os
 import sys

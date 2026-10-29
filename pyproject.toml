@@ -1,5 +1,5 @@
 [project]
-name = "pawangunjkar-github-mcp"
+name = "github-mcp"
 version = "1.1.0"
 description = "MCP server for GitHub operations — 80 tools for repos, PRs, issues, Actions CI/CD, releases, search, and more"
 requires-python = ">=3.10"
@@ -27,7 +27,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pawangunjkar-github-mcp = "server:main"
+github-mcp = "server:main"
 
 [project.urls]
 Homepage = "https://github.com/Pawangunjkar/github-mcp"

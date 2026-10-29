@@ -7,7 +7,7 @@ Run the pre-flight check before the first session:
 python scripts/verify_env.py
 ```
 
-The server command is `uvx pawangunjkar-github-mcp`. Put the token in the client environment. Do not paste a real token into these files.
+The server command is `uvx github-mcp`. Put the token in the client environment. Do not paste a real token into these files.
 
 `session_name` defaults to `default`. A second PAT uses another session name with `github_connect` or `github_save_credentials`.
 
@@ -20,7 +20,7 @@ The server command is `uvx pawangunjkar-github-mcp`. Put the token in the client
   "mcpServers": {
     "github": {
       "command": "uvx",
-      "args": ["pawangunjkar-github-mcp"],
+      "args": ["github-mcp"],
       "env": {
         "GITHUB_TOKEN": "${GITHUB_TOKEN}",
         "GITHUB_API_URL": "https://api.github.com",
@@ -40,7 +40,7 @@ Project `.mcp.json` or the user MCP config:
   "mcpServers": {
     "github": {
       "command": "uvx",
-      "args": ["pawangunjkar-github-mcp"],
+      "args": ["github-mcp"],
       "env": {
         "GITHUB_TOKEN": "${GITHUB_TOKEN}",
         "GITHUB_API_URL": "https://api.github.com",
@@ -61,7 +61,7 @@ Project `.mcp.json` or the user MCP config:
     "github": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["pawangunjkar-github-mcp"],
+      "args": ["github-mcp"],
       "env": {
         "GITHUB_TOKEN": "${GITHUB_TOKEN}",
         "GITHUB_API_URL": "https://api.github.com",

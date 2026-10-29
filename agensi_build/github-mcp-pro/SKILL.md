@@ -7,7 +7,7 @@ description: Dual-mode GitHub Actions CI/CD orchestration for pipeline authoring
 
 # GitHub DevOps Actions Pro
 
-Use `pawangunjkar-github-mcp` as the CI/CD control plane for the enterprise lifecycle suite. Sessions are selected with `session_name` (default `default`). The server reconnects that session from the credential cache or `GITHUB_TOKEN`. Tools do not take a token argument except `github_connect` and `github_save_credentials`.
+Use `github-mcp` as the CI/CD control plane for the enterprise lifecycle suite. Sessions are selected with `session_name` (default `default`). The server reconnects that session from the credential cache or `GITHUB_TOKEN`. Tools do not take a token argument except `github_connect` and `github_save_credentials`.
 
 Run `scripts/verify_env.py` before the first call. Classic PAT scopes for this playbook are `repo` and `workflow`.
 
