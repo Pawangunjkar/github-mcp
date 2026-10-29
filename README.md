@@ -1,6 +1,6 @@
 # 🐙 GitHub MCP Server
 
-> **MCP server for GitHub operations — 73 tools for repos, PRs, issues, actions, releases, search, and more.**
+> **MCP server for GitHub operations — 80 tools for repos, PRs, issues, Actions CI/CD, releases, search, and more.**
 
 A comprehensive [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that exposes the full GitHub REST API as AI-ready tools. Connect your AI assistant (Cursor, Claude Desktop, or any MCP client) to manage GitHub through natural language.
 
@@ -58,7 +58,7 @@ uv run server.py
 
 ## ✨ Features
 
-- 🔌 **73 tools** across **12 categories** — full GitHub API coverage
+- 🔌 **80 tools** across **12 categories** — full GitHub API coverage, including a CI/CD pipeline suite
 - 🔐 **PAT authentication** — Personal Access Token with Bearer auth
 - 🔄 **SSH + HTTPS** — supports both clone/push protocols
 - 📄 **Auto-pagination** — transparently handles paginated API responses
@@ -121,7 +121,7 @@ uv run mcp dev server.py
 
 ---
 
-## 🛠️ Tool Reference (73 Tools)
+## 🛠️ Tool Reference (80 Tools)
 
 ### Category 1: Connection & Authentication (4 tools)
 
@@ -199,17 +199,24 @@ uv run mcp dev server.py
 | `github_list_issue_comments` | List comments on an issue |
 | `github_add_labels` | Add labels to an issue/PR |
 
-### Category 7: Actions & Workflows (7 tools)
+### Category 7: Actions & CI/CD Pipelines (14 tools)
 
-| Tool | Description |
-|------|-------------|
-| `github_list_workflows` | List all workflows in a repo |
-| `github_trigger_workflow` | Trigger a workflow dispatch event |
-| `github_list_workflow_runs` | List workflow runs |
-| `github_get_workflow_run` | Get details of a specific run |
-| `github_get_run_logs` | Get workflow run logs |
-| `github_cancel_workflow_run` | Cancel a running workflow |
-| `github_rerun_workflow` | Re-run a workflow |
+| Tool | Access | Description |
+|------|--------|-------------|
+| `github_list_workflows` | Read-only | List all workflows in a repo |
+| `github_trigger_workflow` | Mutating | Trigger a workflow dispatch event |
+| `github_list_workflow_runs` | Read-only | List workflow runs, including `run_id` |
+| `github_get_workflow_run` | Read-only | Get details of a specific run |
+| `github_get_run_logs` | Read-only | Point at the log archive without inlining it |
+| `github_cancel_workflow_run` | Mutating | Cancel a running workflow |
+| `github_rerun_workflow` | Mutating | Re-run every job in a workflow |
+| `github_generate_action_pipeline` | Preview, or confirm to commit | Generate `.github/workflows/<name>.yml` for Packages, Nexus, Artifactory, or ECR/ACR/GAR, with an optional OpenShift/EKS/AKS/GKE deploy job |
+| `github_get_failed_job_logs` | Read-only | Return the failing step name and a short error excerpt |
+| `github_rerun_failed_jobs` | Confirm | Rerun only failed jobs |
+| `github_get_run_artifacts_metadata` | Read-only | List artifact id, size, SHA256, expiry, and download URL |
+| `github_get_pending_deployments` | Read-only | List environment gates waiting on a run |
+| `github_review_Pending_deployment` | Confirm | Approve or reject a staging/production gate |
+| `github_check_ci_secrets_and_variables` | Read-only | List variable names/values and secret names only |
 
 ### Category 8: Releases (5 tools)
 
@@ -383,6 +390,12 @@ Add to `claude_desktop_config.json`:
 
 "Cancel the running workflow"
 → github_cancel_workflow_run(owner="me", repo="my-app", run_id=12345)
+
+"Why did run 12345 fail?"
+→ github_get_failed_job_logs(owner="me", repo="my-app", run_id=12345)
+
+"Rerun only the failed jobs"
+→ github_rerun_failed_jobs(owner="me", repo="my-app", run_id=12345, confirm=true)
 ```
 
 ### Search
@@ -401,9 +414,13 @@ Add to `claude_desktop_config.json`:
 
 ```
 github-mcp/
-├── server.py              # Main MCP server — 73 tool definitions
+├── server.py              # Main MCP server — tool definitions and registration
+├── actions_tools.py       # Actions and CI/CD pipeline tools (14)
+├── actions_ci.py          # Workflow renderer and failed-log excerpts
 ├── github_client.py       # GitHub REST API client (HTTP, auth, pagination)
 ├── credential_store.py    # Credential caching (env vars, memory, file)
+├── agensi_build/          # Agensi.io skill package source
+├── scripts/build_agensi_zip.py
 ├── pyproject.toml         # Project metadata & dependencies
 ├── .env.example           # Example environment variables
 ├── .gitignore             # Python gitignore

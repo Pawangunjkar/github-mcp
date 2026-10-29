@@ -3,7 +3,7 @@ GitHub MCP Server — Main Entry Point.
 
 Author: Pawan Gunjkar (pawangunjkar@gamil.com)
 
-A comprehensive MCP server providing 73 tools across 12 categories
+A comprehensive MCP server providing 80 tools across 12 categories
 for managing GitHub via AI assistants.
 
 Usage:
@@ -18,6 +18,7 @@ from mcp.server.fastmcp import FastMCP
 
 from github_client import GitHubClient
 from credential_store import CredentialStore
+from actions_tools import register_actions_tools
 
 # ============================================================
 # Initialize MCP Server
@@ -28,9 +29,11 @@ mcp = FastMCP(
     instructions=(
         "GitHub MCP Server — Manage GitHub repositories, PRs, issues, actions, and more via REST API. "
         "Use github_connect to establish a session first (or set GITHUB_TOKEN env var). "
-        "Provides 73 tools across 12 categories: repos, branches, files, PRs, issues, "
+        "Provides 80 tools across 12 categories: repos, branches, files, PRs, issues, "
         "actions, releases, users/orgs, search, gists, webhooks, and notifications. "
-        "Supports both SSH and HTTPS protocols for clone/push URLs."
+        "Actions includes a CI/CD pipeline suite. github_rerun_failed_jobs, "
+        "github_review_Pending_deployment, and committing a generated workflow "
+        "require confirm=true. Supports SSH and HTTPS clone URLs."
     ),
 )
 
@@ -1889,260 +1892,10 @@ def github_add_labels(
 
 
 # ============================================================
-# CATEGORY 7: Actions & Workflows (7 tools)
+# CATEGORY 7: Actions & CI/CD Pipelines (14 tools)
 # ============================================================
 
-@mcp.tool()
-def github_list_workflows(
-    owner: str,
-    repo: str,
-    session_name: str = "default",
-) -> str:
-    """
-    List all GitHub Actions workflows in a repository.
-
-    Args:
-        owner: Repository owner
-        repo: Repository name
-        session_name: GitHub session to use
-    """
-    data, error = _github.get(f"/repos/{owner}/{repo}/actions/workflows", session_name=session_name)
-    if error:
-        return error
-
-    workflows = data.get("workflows", [])
-    if not workflows:
-        return f"⚡ No workflows found in '{owner}/{repo}'."
-
-    lines = [f"⚡ Workflows in '{owner}/{repo}' ({len(workflows)}):\n"]
-    for wf in workflows:
-        state = wf.get("state", "unknown")
-        icon = "🟢" if state == "active" else "⛔"
-        lines.append(
-            f"  {icon} {wf.get('name', '?')}  (ID: {wf.get('id', '?')})\n"
-            f"     File: {wf.get('path', '?')} | State: {state}"
-        )
-
-    return "\n".join(lines)
-
-
-@mcp.tool()
-def github_trigger_workflow(
-    owner: str,
-    repo: str,
-    workflow_id: str,
-    ref: str = "main",
-    inputs: str = "",
-    session_name: str = "default",
-) -> str:
-    """
-    Trigger a workflow dispatch event (manually run a workflow).
-
-    The workflow must have a 'workflow_dispatch' trigger defined.
-
-    Args:
-        owner: Repository owner
-        repo: Repository name
-        workflow_id: Workflow ID or filename (e.g., 'deploy.yml')
-        ref: Branch or tag to run on (default: main)
-        inputs: Workflow inputs as JSON string (e.g., '{"environment": "staging"}')
-        session_name: GitHub session to use
-    """
-    payload = {"ref": ref}
-    if inputs:
-        try:
-            payload["inputs"] = json.loads(inputs)
-        except json.JSONDecodeError:
-            return f"❌ Invalid JSON inputs: {inputs}"
-
-    _, error = _github.post(
-        f"/repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches",
-        json_data=payload,
-        session_name=session_name,
-    )
-    if error:
-        return error
-
-    return f"✅ Workflow '{workflow_id}' triggered on ref '{ref}'." + (f"\n  Inputs: {inputs}" if inputs else "")
-
-
-@mcp.tool()
-def github_list_workflow_runs(
-    owner: str,
-    repo: str,
-    workflow_id: str = "",
-    status: str = "",
-    branch: str = "",
-    max_results: int = 20,
-    session_name: str = "default",
-) -> str:
-    """
-    List workflow runs for a repository or specific workflow.
-
-    Args:
-        owner: Repository owner
-        repo: Repository name
-        workflow_id: Specific workflow ID or filename (empty = all workflows)
-        status: Filter — 'completed', 'in_progress', 'queued', 'success', 'failure'
-        branch: Filter by branch name
-        max_results: Maximum runs to return (default: 20)
-        session_name: GitHub session to use
-    """
-    params = {"per_page": min(max_results, 100)}
-    if status:
-        params["status"] = status
-    if branch:
-        params["branch"] = branch
-
-    path = f"/repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs" if workflow_id else f"/repos/{owner}/{repo}/actions/runs"
-
-    data, error = _github.get(path, params=params, session_name=session_name)
-    if error:
-        return error
-
-    runs = data.get("workflow_runs", [])[:max_results]
-    if not runs:
-        return f"⚡ No workflow runs found."
-
-    lines = [f"⚡ Workflow Runs ({len(runs)}):\n"]
-    for run in runs:
-        conclusion = run.get("conclusion", run.get("status", "unknown"))
-        icon_map = {
-            "success": "🟢", "failure": "🔴", "cancelled": "⚫",
-            "in_progress": "🔵", "queued": "⏳", "skipped": "⬜",
-        }
-        icon = icon_map.get(conclusion, "❓")
-
-        lines.append(
-            f"  {icon} #{run.get('run_number', '?')}: {run.get('name', '?')} — {conclusion}\n"
-            f"     Branch: {run.get('head_branch', '?')} | {run.get('created_at', '?')[:10]}"
-        )
-
-    return "\n".join(lines)
-
-
-@mcp.tool()
-def github_get_workflow_run(
-    owner: str,
-    repo: str,
-    run_id: int,
-    session_name: str = "default",
-) -> str:
-    """
-    Get details of a specific workflow run.
-
-    Args:
-        owner: Repository owner
-        repo: Repository name
-        run_id: Workflow run ID
-        session_name: GitHub session to use
-    """
-    data, error = _github.get(f"/repos/{owner}/{repo}/actions/runs/{run_id}", session_name=session_name)
-    if error:
-        return error
-
-    conclusion = data.get("conclusion", data.get("status", "unknown"))
-    icon_map = {"success": "🟢", "failure": "🔴", "cancelled": "⚫", "in_progress": "🔵"}
-    icon = icon_map.get(conclusion, "❓")
-
-    lines = [f"{icon} Workflow Run #{data.get('run_number', '?')}: {data.get('name', '?')}\n"]
-    lines.append(f"  • Status: {data.get('status', '?')}")
-    lines.append(f"  • Conclusion: {conclusion}")
-    lines.append(f"  • Branch: {data.get('head_branch', '?')}")
-    lines.append(f"  • Event: {data.get('event', '?')}")
-    lines.append(f"  • Created: {data.get('created_at', '?')[:19]}")
-    lines.append(f"  • Updated: {data.get('updated_at', '?')[:19]}")
-    lines.append(f"  • URL: {data.get('html_url', 'N/A')}")
-
-    actor = data.get("actor", {})
-    if actor:
-        lines.append(f"  • Triggered by: @{actor.get('login', '?')}")
-
-    return "\n".join(lines)
-
-
-@mcp.tool()
-def github_get_run_logs(
-    owner: str,
-    repo: str,
-    run_id: int,
-    session_name: str = "default",
-) -> str:
-    """
-    Get the download URL for workflow run logs (returns a redirect URL).
-
-    Args:
-        owner: Repository owner
-        repo: Repository name
-        run_id: Workflow run ID
-        session_name: GitHub session to use
-    """
-    data, error = _github.get(
-        f"/repos/{owner}/{repo}/actions/runs/{run_id}/logs",
-        session_name=session_name,
-        raw=True,
-    )
-    if error:
-        # The logs endpoint often redirects — provide the URL instead
-        return (
-            f"📜 Logs for run #{run_id} can be downloaded from:\n"
-            f"  https://github.com/{owner}/{repo}/actions/runs/{run_id}\n\n"
-            f"💡 Click 'Download logs' in the Actions UI, or use the 'jobs' endpoint for specific job logs."
-        )
-
-    return f"📜 Logs for run #{run_id}:\n\n{data}"
-
-
-@mcp.tool()
-def github_cancel_workflow_run(
-    owner: str,
-    repo: str,
-    run_id: int,
-    session_name: str = "default",
-) -> str:
-    """
-    Cancel a workflow run that is in progress.
-
-    Args:
-        owner: Repository owner
-        repo: Repository name
-        run_id: Workflow run ID to cancel
-        session_name: GitHub session to use
-    """
-    _, error = _github.post(
-        f"/repos/{owner}/{repo}/actions/runs/{run_id}/cancel",
-        session_name=session_name,
-    )
-    if error:
-        return error
-
-    return f"✅ Workflow run #{run_id} cancelled."
-
-
-@mcp.tool()
-def github_rerun_workflow(
-    owner: str,
-    repo: str,
-    run_id: int,
-    session_name: str = "default",
-) -> str:
-    """
-    Re-run a workflow (all jobs or only failed jobs).
-
-    Args:
-        owner: Repository owner
-        repo: Repository name
-        run_id: Workflow run ID to re-run
-        session_name: GitHub session to use
-    """
-    _, error = _github.post(
-        f"/repos/{owner}/{repo}/actions/runs/{run_id}/rerun",
-        session_name=session_name,
-    )
-    if error:
-        return error
-
-    return f"✅ Workflow run #{run_id} re-triggered."
+register_actions_tools(mcp, _github)
 
 
 # ============================================================
