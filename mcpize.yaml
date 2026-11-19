@@ -4,6 +4,9 @@ description: "Production GitHub MCP server with 80 tools across 12 categories: r
 runtime: python
 entry: server.py
 
+build:
+  command: python -m py_compile server.py
+
 startCommand:
   type: http
   command: python -m server --http
