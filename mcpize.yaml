@@ -1,0 +1,33 @@
+version: 1
+name: pawangunjkar-github-mcp
+description: "Production GitHub MCP server with 80 tools across 12 categories: repos, branches, files, PR diffs & merges, issues, Actions CI/CD workflow generation, failed job log triage, artifact verification, deployment gates, releases, search, and notifications."
+runtime: python
+entry: server.py
+
+startCommand:
+  type: http
+  command: python -m server --http
+
+credentials_mode: per_user
+credentials:
+  - name: GITHUB_TOKEN
+    description: "GitHub Personal Access Token (classic or fine-grained) for GitHub REST and Actions API access."
+    required: true
+    placeholder: "your-github-pat-token"
+    docs_url: "https://github.com/settings/tokens"
+  - name: GITHUB_API_URL
+    description: "GitHub API base URL (default: https://api.github.com; override for GitHub Enterprise Server)."
+    required: false
+    placeholder: "https://api.github.com"
+  - name: GITHUB_PROTOCOL
+    description: "Preferred git clone protocol: 'ssh' or 'https' (default: ssh)."
+    required: false
+    placeholder: "ssh"
+  - name: GITHUB_TIMEOUT
+    description: "HTTP request timeout in seconds (default: 30)."
+    required: false
+    placeholder: "30"
+  - name: GITHUB_MCP_CACHE_DIR
+    description: "Optional writable directory for local session credential cache."
+    required: false
+    placeholder: "/tmp/github-mcp-cache"

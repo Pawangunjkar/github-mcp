@@ -88,12 +88,15 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+credentials.json
 
 # Spyder project settings
 .spyderproject
@@ -133,4 +136,8 @@ scripts/
 # Commercial Agensi Files & Distribution
 agensi_packages/
 _agensi_commercial_dist/
+_mcpize_bundles/
 dist/*.zip
+
+# MCPize CLI state
+.mcpize/

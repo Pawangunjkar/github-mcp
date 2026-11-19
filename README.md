@@ -8,6 +8,20 @@ Author: **Pawan Gunjkar** (pawangunjkar@gmail.com)
 
 ---
 
+## 🚀 Hosted Cloud (MCPize.com) & Pro Agent Skill Bundles (Agensi.io)
+
+Use this server locally for free over `stdio` (`uvx`), or deploy/subscribe to the hosted cloud endpoints on **[MCPize.com](https://mcpize.com)** paired with production `SKILL.md` playbooks on **[Agensi.io](https://agensi.io)**:
+
+| Tier | Offering | Cloud Runtime ([MCPize.com](https://mcpize.com)) | Pro Playbook ([Agensi.io](https://agensi.io)) | What's Included |
+| :--- | :--- | :---: | :---: | :--- |
+| **Free Demo** | Starter Access | `$0` *(25 read-only calls/mo)* | `github-mcp-lite` (`$0`) | Read-only repo health & PR triage summary |
+| **Individual Pro** *(This Repo)* | **`github-mcp`** | **`$15/mo`** *(`pawangunjkar-github-mcp`)* | `github-mcp-pro` (`$15`) | All **80 GitHub & Actions CI/CD tools** + 5 workflow playbooks |
+| **3-in-1 Bundle** | **Cloud-Native DevOps Pack** *(Saves 26%)* | **`$39/mo`** *(`pawangunjkar-bundle-cloud-native-devops-mcp`)* | Bundle 1 (`$39`) | `github-mcp` (80) + `k8s-mcp` (23) + `observability-mcp` (15) = **118 tools** |
+| **3-in-1 Bundles** | **Enterprise Release** \| **SRE Incident Triage** | **`$39/mo`** each | Bundle 2 \| Bundle 3 (`$39`) | `jenkins+artifact+k8s` (88 tools) \| `k8s+obs+linux-ssh` (100 tools) |
+| **6-in-1 Master Suite** | **Enterprise SDLC Orchestrator** *(Saves 37%)* | **`$69/mo`** *(`pawangunjkar-enterprise-sdlc-suite`)* | `enterprise-sdlc-orchestrator` (`$69`) | **All 6 MCP servers unified (245 tools)** + end-to-end SDLC/SRE workflows |
+
+---
+
 ## 📥 Install
 
 ### Option 1: PyPI / uvx (Recommended)
