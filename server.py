@@ -1,7 +1,7 @@
 """
 GitHub MCP Server — Main Entry Point.
 
-Author: Pawan Gunjkar (pawangunjkar@gamil.com)
+Author: Pawan Gunjkar (pawangunjkar@gmail.com)
 
 A comprehensive MCP server providing 80 tools across 12 categories
 for managing GitHub via AI assistants.
@@ -15,11 +15,17 @@ import os
 import sys
 import json
 import base64
+from urllib.parse import quote
 from mcp.server.fastmcp import FastMCP
 
 from github_client import GitHubClient
 from credential_store import CredentialStore
 from actions_tools import register_actions_tools
+
+
+def _q(value: str, extra_safe: str = "") -> str:
+    """URL-encode a repo path, branch, or tag for use in an API path. Slashes are kept."""
+    return quote(str(value).strip("/"), safe="/" + extra_safe)
 
 # ============================================================
 # Initialize MCP Server
@@ -605,7 +611,7 @@ def github_get_branch(
         branch: Branch name
         session_name: GitHub session to use
     """
-    data, error = _github.get(f"/repos/{owner}/{repo}/branches/{branch}", session_name=session_name)
+    data, error = _github.get(f"/repos/{owner}/{repo}/branches/{_q(branch)}", session_name=session_name)
     if error:
         return error
 
@@ -659,7 +665,7 @@ def github_create_branch(
             from_branch = repo_data.get("default_branch", "main")
 
         ref_data, error = _github.get(
-            f"/repos/{owner}/{repo}/git/ref/heads/{from_branch}",
+            f"/repos/{owner}/{repo}/git/ref/heads/{_q(from_branch)}",
             session_name=session_name,
         )
         if error:
@@ -698,7 +704,7 @@ def github_delete_branch(
         session_name: GitHub session to use
     """
     _, error = _github.delete(
-        f"/repos/{owner}/{repo}/git/refs/heads/{branch}",
+        f"/repos/{owner}/{repo}/git/refs/heads/{_q(branch)}",
         session_name=session_name,
     )
     if error:
@@ -718,7 +724,11 @@ def github_protect_branch(
     session_name: str = "default",
 ) -> str:
     """
-    Set branch protection rules.
+    Set branch protection rules (reviews and admin enforcement).
+
+    Existing protection settings that this tool does not manage — required status
+    checks, push restrictions, linear history, conversation resolution, etc. — are
+    read first and preserved, so calling this never silently removes CI checks.
 
     Args:
         owner: Repository owner
@@ -729,32 +739,106 @@ def github_protect_branch(
         enforce_admins: Enforce rules for admins too (default: False)
         session_name: GitHub session to use
     """
-    payload = {
-        "enforce_admins": enforce_admins,
-        "required_status_checks": None,
-        "restrictions": None,
-    }
+    endpoint = f"/repos/{owner}/{repo}/branches/{_q(branch)}/protection"
+    existing, error = _github.get(endpoint, session_name=session_name)
+    if error:
+        if "HTTP 404" not in error:
+            return error
+        existing = {}  # Branch is not protected yet.
+
+    payload = _protection_payload(existing or {})
+    payload["enforce_admins"] = enforce_admins
 
     if require_reviews:
-        payload["required_pull_request_reviews"] = {
-            "required_approving_review_count": required_reviewers,
-        }
+        reviews = payload.get("required_pull_request_reviews") or {}
+        reviews["required_approving_review_count"] = max(0, min(int(required_reviewers), 6))
+        payload["required_pull_request_reviews"] = reviews
     else:
         payload["required_pull_request_reviews"] = None
 
-    _, error = _github.put(
-        f"/repos/{owner}/{repo}/branches/{branch}/protection",
-        json_data=payload,
-        session_name=session_name,
-    )
+    _, error = _github.put(endpoint, json_data=payload, session_name=session_name)
     if error:
         return error
 
-    return (
-        f"✅ Branch protection set for '{branch}' in '{owner}/{repo}'.\n"
-        f"  • Reviews required: {require_reviews} ({required_reviewers} reviewers)\n"
-        f"  • Enforce for admins: {enforce_admins}"
-    )
+    status = payload.get("required_status_checks") or {}
+    checks = status.get("contexts") or [c.get("context") for c in status.get("checks") or []]
+    lines = [
+        f"✅ Branch protection set for '{branch}' in '{owner}/{repo}'.",
+        f"  • Reviews required: {require_reviews} ({required_reviewers} reviewers)",
+        f"  • Enforce for admins: {enforce_admins}",
+    ]
+    if checks:
+        lines.append(f"  • Required status checks preserved: {', '.join(c for c in checks if c)}")
+    if payload.get("restrictions"):
+        lines.append("  • Push restrictions preserved")
+    return "\n".join(lines)
+
+
+def _protection_payload(current: dict) -> dict:
+    """Convert a GET /protection response into the PUT request shape, keeping every setting."""
+
+    def enabled(key: str):
+        value = current.get(key)
+        return bool(value.get("enabled")) if isinstance(value, dict) else None
+
+    payload: dict = {"required_status_checks": None, "restrictions": None, "enforce_admins": False}
+
+    checks = current.get("required_status_checks")
+    if checks:
+        status: dict = {"strict": bool(checks.get("strict"))}
+        if checks.get("checks"):
+            status["checks"] = [
+                {k: v for k, v in item.items() if k in ("context", "app_id") and v is not None}
+                for item in checks["checks"]
+            ]
+        else:
+            status["contexts"] = list(checks.get("contexts") or [])
+        payload["required_status_checks"] = status
+
+    reviews = current.get("required_pull_request_reviews")
+    if reviews:
+        kept = {
+            key: reviews[key]
+            for key in (
+                "dismiss_stale_reviews",
+                "require_code_owner_reviews",
+                "required_approving_review_count",
+                "require_last_push_approval",
+            )
+            if key in reviews
+        }
+        dismissal = reviews.get("dismissal_restrictions") or {}
+        if dismissal:
+            kept["dismissal_restrictions"] = {
+                "users": [u.get("login") for u in dismissal.get("users") or [] if u.get("login")],
+                "teams": [t.get("slug") for t in dismissal.get("teams") or [] if t.get("slug")],
+                "apps": [a.get("slug") for a in dismissal.get("apps") or [] if a.get("slug")],
+            }
+        payload["required_pull_request_reviews"] = kept
+    else:
+        payload["required_pull_request_reviews"] = None
+
+    restrictions = current.get("restrictions")
+    if restrictions:
+        payload["restrictions"] = {
+            "users": [u.get("login") for u in restrictions.get("users") or [] if u.get("login")],
+            "teams": [t.get("slug") for t in restrictions.get("teams") or [] if t.get("slug")],
+            "apps": [a.get("slug") for a in restrictions.get("apps") or [] if a.get("slug")],
+        }
+
+    for key in (
+        "required_linear_history",
+        "allow_force_pushes",
+        "allow_deletions",
+        "block_creations",
+        "required_conversation_resolution",
+        "lock_branch",
+        "allow_fork_syncing",
+    ):
+        value = enabled(key)
+        if value is not None:
+            payload[key] = value
+    return payload
 
 
 @mcp.tool()
@@ -864,7 +948,7 @@ def github_compare_branches(
         session_name: GitHub session to use
     """
     data, error = _github.get(
-        f"/repos/{owner}/{repo}/compare/{base}...{head}",
+        f"/repos/{owner}/{repo}/compare/{_q(base, ':')}...{_q(head, ':')}",
         session_name=session_name,
     )
     if error:
@@ -903,6 +987,10 @@ def github_get_file(
     """
     Get file content from a repository (auto-decodes base64).
 
+    Files larger than 1 MB (which the contents API returns without a body) are
+    fetched through the raw media type. Binary files are detected and summarised
+    instead of being dumped as garbled text. Text over 50 KB is truncated.
+
     Args:
         owner: Repository owner
         repo: Repository name
@@ -914,8 +1002,9 @@ def github_get_file(
     if ref:
         params["ref"] = ref
 
+    endpoint = f"/repos/{owner}/{repo}/contents/{_q(path)}"
     data, error = _github.get(
-        f"/repos/{owner}/{repo}/contents/{path}",
+        endpoint,
         params=params if params else None,
         session_name=session_name,
     )
@@ -924,17 +1013,30 @@ def github_get_file(
 
     if isinstance(data, list):
         return f"📁 '{path}' is a directory. Use github_get_tree to list contents."
+    if data.get("type") in ("symlink", "submodule"):
+        target = data.get("target") or data.get("submodule_git_url") or "?"
+        return f"🔗 '{path}' is a {data.get('type')} → {target}"
 
     content = data.get("content", "")
     encoding = data.get("encoding", "")
 
     if encoding == "base64" and content:
         try:
-            decoded = base64.b64decode(content).decode("utf-8", errors="replace")
+            raw_bytes = base64.b64decode(content)
         except Exception:
-            decoded = "(binary file — cannot decode)"
+            raw_bytes = None
     else:
-        decoded = content
+        # Files over 1 MB come back with encoding 'none' and no content.
+        raw_bytes, error = _github.get_bytes(
+            endpoint,
+            params=params if params else None,
+            headers={"Accept": "application/vnd.github.raw"},
+            session_name=session_name,
+        )
+        if error:
+            return error
+
+    decoded = _render_file_bytes(raw_bytes, data.get("size", 0))
 
     lines = [f"📄 {data.get('name', path)} ({data.get('size', 0)} bytes)\n"]
     lines.append(f"  • Path: {data.get('path', path)}")
@@ -944,6 +1046,21 @@ def github_get_file(
     lines.append(f"\n{decoded}")
 
     return "\n".join(lines)
+
+
+_MAX_FILE_TEXT = 50 * 1024
+
+
+def _render_file_bytes(raw_bytes, size: int) -> str:
+    """Return printable text for file bytes, or a short note for binary/undecodable content."""
+    if raw_bytes is None:
+        return "(could not decode file content)"
+    if b"\x00" in raw_bytes[:8192]:
+        return f"(binary file, {size or len(raw_bytes):,} bytes — content not shown)"
+    text = raw_bytes.decode("utf-8", errors="replace")
+    if len(text) > _MAX_FILE_TEXT:
+        return text[:_MAX_FILE_TEXT] + f"\n\n... [TRUNCATED — showing first {_MAX_FILE_TEXT:,} of {len(text):,} characters]"
+    return text
 
 
 @mcp.tool()
@@ -978,7 +1095,7 @@ def github_create_file(
         payload["branch"] = branch
 
     data, error = _github.put(
-        f"/repos/{owner}/{repo}/contents/{path}",
+        f"/repos/{owner}/{repo}/contents/{_q(path)}",
         json_data=payload,
         session_name=session_name,
     )
@@ -1031,7 +1148,7 @@ def github_update_file(
         payload["branch"] = branch
 
     data, error = _github.put(
-        f"/repos/{owner}/{repo}/contents/{path}",
+        f"/repos/{owner}/{repo}/contents/{_q(path)}",
         json_data=payload,
         session_name=session_name,
     )
@@ -1076,7 +1193,7 @@ def github_delete_file(
         payload["branch"] = branch
 
     _, error = _github.delete(
-        f"/repos/{owner}/{repo}/contents/{path}",
+        f"/repos/{owner}/{repo}/contents/{_q(path)}",
         json_data=payload,
         session_name=session_name,
     )
@@ -1108,7 +1225,7 @@ def github_get_tree(
     if ref:
         params["ref"] = ref
 
-    endpoint = f"/repos/{owner}/{repo}/contents/{path}" if path else f"/repos/{owner}/{repo}/contents"
+    endpoint = f"/repos/{owner}/{repo}/contents/{_q(path)}" if path else f"/repos/{owner}/{repo}/contents"
     data, error = _github.get(endpoint, params=params if params else None, session_name=session_name)
     if error:
         return error
@@ -1151,19 +1268,20 @@ def github_get_clone_url(
         protocol: 'ssh' or 'https' (empty = use session default)
         session_name: GitHub session to use
     """
-    if not protocol:
-        protocol = _github.get_protocol(session_name)
+    protocol = (protocol or _github.get_protocol(session_name)).lower()
+    if protocol not in ("ssh", "https"):
+        protocol = "ssh"
 
-    if protocol == "https":
-        url = f"https://github.com/{owner}/{repo}.git"
-    else:
-        url = f"git@github.com:{owner}/{repo}.git"
-
+    # Works for github.com and GitHub Enterprise Server / Cloud hosts alike.
+    session, _ = _github._get_session(session_name)
+    host = _github.web_host(session.api_url if session else "https://api.github.com")
+    urls = {
+        "https": f"https://{host}/{owner}/{repo}.git",
+        "ssh": f"git@{host}:{owner}/{repo}.git",
+    }
+    url = urls[protocol]
     other_protocol = "https" if protocol == "ssh" else "ssh"
-    if other_protocol == "https":
-        other_url = f"https://github.com/{owner}/{repo}.git"
-    else:
-        other_url = f"git@github.com:{owner}/{repo}.git"
+    other_url = urls[other_protocol]
 
     return (
         f"🔗 Clone URL for '{owner}/{repo}':\n\n"
@@ -1964,7 +2082,7 @@ def github_get_release(
         session_name: GitHub session to use
     """
     if tag:
-        path = f"/repos/{owner}/{repo}/releases/tags/{tag}"
+        path = f"/repos/{owner}/{repo}/releases/tags/{_q(tag)}"
     elif release_id:
         path = f"/repos/{owner}/{repo}/releases/{release_id}"
     else:

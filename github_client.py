@@ -1,7 +1,7 @@
 """
 GitHub REST API Client for GitHub MCP Server.
 
-Author: Pawan Gunjkar (pawangunjkar@gamil.com)
+Author: Pawan Gunjkar (pawangunjkar@gmail.com)
 
 Handles all HTTP communication with the GitHub API:
 - Bearer token authentication with Personal Access Tokens
@@ -15,6 +15,7 @@ Handles all HTTP communication with the GitHub API:
 import sys
 import time
 from typing import Optional, Any
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -26,6 +27,7 @@ DEFAULT_TIMEOUT = 30
 MAX_OUTPUT_SIZE = 50 * 1024  # 50KB
 DEFAULT_PER_PAGE = 30
 MAX_PER_PAGE = 100
+MAX_RATE_LIMIT_WAIT = 90  # seconds; longer waits are reported instead of slept through
 
 
 class GitHubClient:
@@ -220,12 +222,87 @@ class GitHubClient:
     # Core HTTP Methods
     # ================================================================
 
+    def _send(
+        self,
+        session: "_GitHubSession",
+        method: str,
+        path: str,
+        **kwargs: Any,
+    ) -> httpx.Response:
+        """
+        Send one request, waiting out GitHub rate limits once when the wait is short.
+
+        GitHub rejects rate-limited calls before doing any work, so a retry is safe
+        for every method. Waits longer than MAX_RATE_LIMIT_WAIT are not attempted;
+        the error is returned with the reset time instead.
+        """
+        response = session.client.request(method, path, **kwargs)
+        self._check_rate_limit(response, session)
+        wait = self._rate_limit_wait(response)
+        if wait is not None and wait <= MAX_RATE_LIMIT_WAIT:
+            print(f"⏳ GitHub rate limit hit; retrying in {wait:.0f}s", file=sys.stderr)
+            time.sleep(wait)
+            response = session.client.request(method, path, **kwargs)
+            self._check_rate_limit(response, session)
+        session.last_used = time.time()
+        session.request_count += 1
+        return response
+
+    @staticmethod
+    def _rate_limit_wait(response: httpx.Response) -> Optional[float]:
+        """Seconds to wait if this response is a primary or secondary rate-limit rejection."""
+        if response.status_code not in (403, 429):
+            return None
+        retry_after = response.headers.get("Retry-After")
+        if retry_after and retry_after.isdigit():
+            return float(retry_after)
+        if response.headers.get("X-RateLimit-Remaining") == "0":
+            reset = response.headers.get("X-RateLimit-Reset", "")
+            if reset.isdigit():
+                return max(1.0, float(reset) - time.time() + 1)
+        try:
+            message = str(response.json().get("message", "")).lower()
+        except Exception:
+            message = ""
+        if "secondary rate limit" in message:
+            return 60.0
+        return None
+
+    @staticmethod
+    def _decode(response: httpx.Response) -> Any:
+        if not response.text.strip():
+            return None
+        try:
+            return response.json()
+        except Exception:
+            return response.text
+
+    def _call(
+        self,
+        method: str,
+        path: str,
+        session_name: str,
+        **kwargs: Any,
+    ) -> tuple[Optional[Any], Optional[str]]:
+        session, error = self._get_session(session_name)
+        if error:
+            return None, error
+        try:
+            response = self._send(session, method, path, **kwargs)
+            response.raise_for_status()
+            return self._decode(response), None
+        except httpx.HTTPStatusError as e:
+            return None, self._format_api_error(e, path)
+        except Exception as e:
+            return None, f"❌ Request failed: {str(e)}"
+
     def get(
         self,
         path: str,
         session_name: str = "default",
         params: Optional[dict] = None,
         raw: bool = False,
+        headers: Optional[dict] = None,
     ) -> tuple[Optional[Any], Optional[str]]:
         """
         Perform a GET request. Returns (data, error).
@@ -236,11 +313,8 @@ class GitHubClient:
             return None, error
 
         try:
-            response = session.client.get(path, params=params)
-            self._check_rate_limit(response, session)
+            response = self._send(session, "GET", path, params=params, headers=headers)
             response.raise_for_status()
-            session.last_used = time.time()
-            session.request_count += 1
 
             if raw:
                 text = response.text
@@ -250,6 +324,26 @@ class GitHubClient:
 
             return response.json(), None
 
+        except httpx.HTTPStatusError as e:
+            return None, self._format_api_error(e, path)
+        except Exception as e:
+            return None, f"❌ Request failed: {str(e)}"
+
+    def get_bytes(
+        self,
+        path: str,
+        session_name: str = "default",
+        params: Optional[dict] = None,
+        headers: Optional[dict] = None,
+    ) -> tuple[Optional[bytes], Optional[str]]:
+        """GET raw bytes (e.g. file contents with Accept: application/vnd.github.raw)."""
+        session, error = self._get_session(session_name)
+        if error:
+            return None, error
+        try:
+            response = self._send(session, "GET", path, params=params, headers=headers)
+            response.raise_for_status()
+            return response.content, None
         except httpx.HTTPStatusError as e:
             return None, self._format_api_error(e, path)
         except Exception as e:
@@ -280,15 +374,12 @@ class GitHubClient:
         try:
             while url and len(all_items) < max_items:
                 if url.startswith("http"):
-                    response = session.client.get(url)
+                    response = self._send(session, "GET", url)
                 else:
-                    response = session.client.get(url, params=params)
+                    response = self._send(session, "GET", url, params=params)
                     params = None  # Only use params for first request
 
-                self._check_rate_limit(response, session)
                 response.raise_for_status()
-                session.last_used = time.time()
-                session.request_count += 1
 
                 data = response.json()
                 if isinstance(data, list):
@@ -317,36 +408,10 @@ class GitHubClient:
         content_type: Optional[str] = None,
     ) -> tuple[Optional[Any], Optional[str]]:
         """Perform a POST request. Returns (data, error)."""
-        session, error = self._get_session(session_name)
-        if error:
-            return None, error
-
-        headers = {}
-        if content_type:
-            headers["Content-Type"] = content_type
-
-        try:
-            if json_data is not None:
-                response = session.client.post(path, json=json_data, headers=headers)
-            else:
-                response = session.client.post(path, content=raw_data, headers=headers)
-
-            self._check_rate_limit(response, session)
-            response.raise_for_status()
-            session.last_used = time.time()
-            session.request_count += 1
-
-            if response.text.strip():
-                try:
-                    return response.json(), None
-                except Exception:
-                    return response.text, None
-            return None, None
-
-        except httpx.HTTPStatusError as e:
-            return None, self._format_api_error(e, path)
-        except Exception as e:
-            return None, f"❌ Request failed: {str(e)}"
+        headers = {"Content-Type": content_type} if content_type else None
+        if json_data is not None:
+            return self._call("POST", path, session_name, json=json_data, headers=headers)
+        return self._call("POST", path, session_name, content=raw_data, headers=headers)
 
     def put(
         self,
@@ -355,28 +420,7 @@ class GitHubClient:
         json_data: Optional[dict] = None,
     ) -> tuple[Optional[Any], Optional[str]]:
         """Perform a PUT request. Returns (data, error)."""
-        session, error = self._get_session(session_name)
-        if error:
-            return None, error
-
-        try:
-            response = session.client.put(path, json=json_data)
-            self._check_rate_limit(response, session)
-            response.raise_for_status()
-            session.last_used = time.time()
-            session.request_count += 1
-
-            if response.text.strip():
-                try:
-                    return response.json(), None
-                except Exception:
-                    return response.text, None
-            return None, None
-
-        except httpx.HTTPStatusError as e:
-            return None, self._format_api_error(e, path)
-        except Exception as e:
-            return None, f"❌ Request failed: {str(e)}"
+        return self._call("PUT", path, session_name, json=json_data)
 
     def patch(
         self,
@@ -385,28 +429,7 @@ class GitHubClient:
         json_data: Optional[dict] = None,
     ) -> tuple[Optional[Any], Optional[str]]:
         """Perform a PATCH request. Returns (data, error)."""
-        session, error = self._get_session(session_name)
-        if error:
-            return None, error
-
-        try:
-            response = session.client.patch(path, json=json_data)
-            self._check_rate_limit(response, session)
-            response.raise_for_status()
-            session.last_used = time.time()
-            session.request_count += 1
-
-            if response.text.strip():
-                try:
-                    return response.json(), None
-                except Exception:
-                    return response.text, None
-            return None, None
-
-        except httpx.HTTPStatusError as e:
-            return None, self._format_api_error(e, path)
-        except Exception as e:
-            return None, f"❌ Request failed: {str(e)}"
+        return self._call("PATCH", path, session_name, json=json_data)
 
     def delete(
         self,
@@ -415,28 +438,7 @@ class GitHubClient:
         json_data: Optional[dict] = None,
     ) -> tuple[Optional[Any], Optional[str]]:
         """Perform a DELETE request. Returns (data, error)."""
-        session, error = self._get_session(session_name)
-        if error:
-            return None, error
-
-        try:
-            response = session.client.delete(path, json=json_data)
-            self._check_rate_limit(response, session)
-            response.raise_for_status()
-            session.last_used = time.time()
-            session.request_count += 1
-
-            if response.text.strip():
-                try:
-                    return response.json(), None
-                except Exception:
-                    return response.text, None
-            return None, None
-
-        except httpx.HTTPStatusError as e:
-            return None, self._format_api_error(e, path)
-        except Exception as e:
-            return None, f"❌ Request failed: {str(e)}"
+        return self._call("DELETE", path, session_name, json=json_data)
 
     # ================================================================
     # Helpers
@@ -489,14 +491,27 @@ class GitHubClient:
     def get_clone_url(self, owner: str, repo: str, session_name: str = "default") -> str:
         """Get the clone URL in the preferred protocol."""
         protocol = self.get_protocol(session_name)
+        session, _ = self._get_session(session_name)
+        host = self.web_host(session.api_url if session else "https://api.github.com")
         if protocol == "https":
-            session, _ = self._get_session(session_name)
-            base = "https://github.com"
-            if session and session.api_url != "https://api.github.com":
-                base = session.api_url.replace("/api/v3", "")
-            return f"{base}/{owner}/{repo}.git"
-        else:
-            return f"git@github.com:{owner}/{repo}.git"
+            return f"https://{host}/{owner}/{repo}.git"
+        return f"git@{host}:{owner}/{repo}.git"
+
+    @staticmethod
+    def web_host(api_url: str) -> str:
+        """
+        Map an API URL to the git host.
+
+        https://api.github.com            → github.com
+        https://ghe.corp.com/api/v3       → ghe.corp.com
+        https://api.acme.ghe.com          → acme.ghe.com (GitHub Enterprise Cloud with data residency)
+        """
+        netloc = urlsplit(api_url or "https://api.github.com").netloc or "api.github.com"
+        if netloc == "api.github.com":
+            return "github.com"
+        if netloc.startswith("api.") and netloc.endswith(".ghe.com"):
+            return netloc[len("api."):]
+        return netloc
 
     # ================================================================
     # Session Info

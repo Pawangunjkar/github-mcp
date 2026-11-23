@@ -1,7 +1,7 @@
 """
 Credential Store for GitHub MCP Server.
 
-Author: Pawan Gunjkar (pawangunjkar@gamil.com)
+Author: Pawan Gunjkar (pawangunjkar@gmail.com)
 
 Manages GitHub connection credentials with a layered lookup strategy:
 1. Environment variables (GITHUB_TOKEN, GITHUB_API_URL, GITHUB_PROTOCOL)

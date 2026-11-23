@@ -308,9 +308,11 @@ def register_actions_tools(mcp, github) -> None:
             raw=True,
         )
         if error or not data or str(data).startswith("PK"):
+            session, _ = github._get_session(session_name)
+            host = github.web_host(session.api_url) if session else "github.com"
             return (
                 f"📜 Logs for run_id={run_id} are an archive, not an inline excerpt.\n"
-                f"  https://github.com/{owner}/{repo}/actions/runs/{run_id}\n\n"
+                f"  https://{host}/{owner}/{repo}/actions/runs/{run_id}\n\n"
                 "Use github_get_failed_job_logs for the failing step name and a short error excerpt."
             )
         text = str(data)
