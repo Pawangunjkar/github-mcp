@@ -133,4 +133,5 @@ agensi_build/
 scripts/
 
 dist/*.zip
+.mcpize/
 
