@@ -18,9 +18,9 @@ import base64
 from urllib.parse import quote
 from mcp.server.fastmcp import FastMCP
 
-from github_client import GitHubClient
-from credential_store import CredentialStore
-from actions_tools import register_actions_tools
+from github_mcp.github_client import GitHubClient
+from github_mcp.credential_store import CredentialStore
+from github_mcp.actions_tools import register_actions_tools
 
 
 def _q(value: str, extra_safe: str = "") -> str:

@@ -11,7 +11,7 @@ from urllib.parse import quote
 
 from pydantic import Field
 
-from actions_ci import extract_failure_excerpt, redact_variable_value, render_ci_pipeline
+from github_mcp.actions_ci import extract_failure_excerpt, redact_variable_value, render_ci_pipeline
 
 _SESSION = (
     "Named GitHub session created by github_connect. Defaults to 'default'. "

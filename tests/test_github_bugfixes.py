@@ -19,15 +19,16 @@ from unittest import mock
 import httpx
 
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
 
 os.environ["GITHUB_MCP_CACHE_DIR"] = tempfile.mkdtemp()
 os.environ.pop("GITHUB_TOKEN", None)
 
-import github_client  # noqa: E402
-import server  # noqa: E402
-from github_client import GitHubClient, _GitHubSession  # noqa: E402
+from github_mcp import github_client  # noqa: E402
+from github_mcp import server  # noqa: E402
+from github_mcp.github_client import GitHubClient, _GitHubSession  # noqa: E402
 
 
 class FakeGitHub:

@@ -8,20 +8,6 @@ Author: **Pawan Gunjkar** (pawangunjkar@gmail.com)
 
 ---
 
-## 🚀 Hosted Cloud (MCPize.com) & Pro Agent Skill Bundles (Agensi.io)
-
-Use this server locally for free over `stdio` (`uvx`), or deploy/subscribe to the hosted cloud endpoints on **[MCPize.com](https://mcpize.com)** paired with production `SKILL.md` playbooks on **[Agensi.io](https://agensi.io)**:
-
-| Tier | Offering | Cloud Runtime ([MCPize.com](https://mcpize.com)) | Pro Playbook ([Agensi.io](https://agensi.io)) | What's Included |
-| :--- | :--- | :---: | :---: | :--- |
-| **Free Demo** | Starter Access | `$0` *(25 read-only calls/mo)* | `github-mcp-lite` (`$0`) | Read-only repo health & PR triage summary |
-| **Individual Pro** *(This Repo)* | **`github-mcp`** | **`$15/mo`** *(`pawangunjkar-github-mcp`)* | `github-mcp-pro` (`$15`) | All **80 GitHub & Actions CI/CD tools** + 5 workflow playbooks |
-| **3-in-1 Bundle** | **Cloud-Native DevOps Pack** *(Saves 26%)* | **`$39/mo`** *(`pawangunjkar-bundle-cloud-native-devops-mcp`)* | Bundle 1 (`$39`) | `github-mcp` (80) + `k8s-mcp` (23) + `observability-mcp` (15) = **118 tools** |
-| **3-in-1 Bundles** | **Enterprise Release** \| **SRE Incident Triage** | **`$39/mo`** each | Bundle 2 \| Bundle 3 (`$39`) | `jenkins+artifact+k8s` (88 tools) \| `k8s+obs+linux-ssh` (100 tools) |
-| **6-in-1 Master Suite** | **Enterprise SDLC Orchestrator** *(Saves 37%)* | **`$69/mo`** *(`pawangunjkar-enterprise-sdlc-suite`)* | `enterprise-sdlc-orchestrator` (`$69`) | **All 6 MCP servers unified (245 tools)** + end-to-end SDLC/SRE workflows |
-
----
-
 ## 📥 Install
 
 ### Option 1: PyPI / uvx (Recommended)
@@ -63,10 +49,24 @@ Or browse [smithery.ai](https://smithery.ai) and search for **github-mcp**.
 git clone https://github.com/Pawangunjkar/github-mcp.git
 cd github-mcp
 uv sync
-uv run server.py
+uv run github-mcp
 ```
 
 > See [PUBLISHING.md](PUBLISHING.md) for PyPI, Smithery, and directory submission steps.
+
+---
+
+## ⚙️ How It Works
+
+```text
+AI Client (Cursor, Claude Desktop, Antigravity, Windsurf)
+        │  MCP (stdio by default, or streamable-http / sse)
+        ▼
+github_mcp.server (FastMCP — 80 tools across 12 categories)
+        ├── CredentialStore (~/.github-mcp-cache/credentials.json)
+        ├── GitHubClient (httpx REST client, auto-pagination, rate-limit tracking)
+        └── actions_tools / actions_ci (workflow generation, failed-step log excerpts)
+```
 
 ---
 
@@ -127,10 +127,10 @@ github_connect(token="ghp_xxxxxxxxxxxx", protocol="ssh")
 
 ```bash
 # For Cursor / Claude Desktop (stdio transport)
-uv run server.py
+uv run github-mcp
 
 # For testing with MCP Inspector
-uv run mcp dev server.py
+uv run mcp dev src/github_mcp/server.py
 ```
 
 ---
@@ -334,7 +334,7 @@ Add to `.cursor/mcp.json`:
   "mcpServers": {
     "github": {
       "command": "uv",
-      "args": ["run", "--directory", "/path/to/github-mcp", "server.py"],
+      "args": ["run", "--directory", "/path/to/github-mcp", "github-mcp"],
       "env": {
         "GITHUB_TOKEN": "ghp_your-token-here",
         "GITHUB_PROTOCOL": "ssh"
@@ -426,20 +426,23 @@ Add to `claude_desktop_config.json`:
 
 ## 📁 Project Structure
 
-```
+```text
 github-mcp/
-├── server.py              # Main MCP server — tool definitions and registration
-├── actions_tools.py       # Actions and CI/CD pipeline tools (14)
-├── actions_ci.py          # Workflow renderer and failed-log excerpts
-├── github_client.py       # GitHub REST API client (HTTP, auth, pagination)
-├── credential_store.py    # Credential caching (env vars, memory, file)
-├── agensi_build/          # Agensi.io skill package source
-├── scripts/build_agensi_zip.py
-├── pyproject.toml         # Project metadata & dependencies
-├── .env.example           # Example environment variables
-├── .gitignore             # Python gitignore
-├── LICENSE                # MIT license
-└── README.md              # This file
+├── src/github_mcp/
+│   ├── __init__.py          # Package version
+│   ├── __main__.py          # `python -m github_mcp` entry point
+│   ├── server.py            # Main MCP server — tool definitions and registration
+│   ├── actions_tools.py     # Actions and CI/CD pipeline tools (14)
+│   ├── actions_ci.py        # Workflow renderer and failed-log excerpts
+│   ├── github_client.py     # GitHub REST API client (HTTP, auth, pagination)
+│   └── credential_store.py  # Credential caching (env vars, memory, file)
+├── tests/                   # Unit & httpx.MockTransport regression tests
+├── pyproject.toml           # Project metadata & dependencies
+├── Dockerfile               # Streamable HTTP container
+├── .env.example             # Example environment variables
+├── .gitignore               # Python gitignore
+├── LICENSE                  # MIT license
+└── README.md                # This file
 ```
 
 ---

@@ -19,7 +19,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from credential_store import CredentialStore, GitHubCredentials
+from github_mcp.credential_store import CredentialStore, GitHubCredentials
 
 
 # Constants

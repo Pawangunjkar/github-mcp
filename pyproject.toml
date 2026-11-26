@@ -27,7 +27,7 @@ dependencies = [
 ]
 
 [project.scripts]
-github-mcp = "server:main"
+github-mcp = "github_mcp.server:main"
 
 [project.urls]
 Homepage = "https://github.com/Pawangunjkar/github-mcp"
@@ -40,22 +40,12 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["."]
-
-[tool.hatch.build.targets.wheel.force-include]
-"server.py" = "server.py"
-"github_client.py" = "github_client.py"
-"credential_store.py" = "credential_store.py"
-"actions_ci.py" = "actions_ci.py"
-"actions_tools.py" = "actions_tools.py"
+packages = ["src/github_mcp"]
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "server.py",
-    "github_client.py",
-    "credential_store.py",
-    "actions_ci.py",
-    "actions_tools.py",
+    "src",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE",
 ]
